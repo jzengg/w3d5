@@ -1,6 +1,6 @@
 require_relative '02_searchable'
 require 'active_support/inflector'
-
+require 'byebug'
 # Phase IIIa
 class AssocOptions
   attr_accessor(
@@ -44,7 +44,7 @@ class HasManyOptions < AssocOptions
       primary_key: :id,
       class_name: "#{name.to_s.camelize.singularize}"
     }
-
+    # byebug
     attributes = defaults.merge(options)
 
     attributes.each do |key, value|
@@ -97,23 +97,21 @@ module Associatable
   end
 
   def has_many(name, options = {})
-    options = HasManyOptions.new(name, options)
-
+    options = HasManyOptions.new(name, self, options)
     define_method(name) do
+      # byebug
       # return nil if self.send(options.foreign_key).nil?
-      puts options.table_name
-      puts options.class_name
-      puts name
+
       results = DBConnection.execute(<<-SQL)
       SELECT
         *
       FROM
         #{options.table_name}
       WHERE
-        #{options.table_name}.#{options.primary_key} = #{self.send(options.foreign_key)}
+        #{options.table_name}.#{options.foreign_key} = #{self.send(options.primary_key)}
       SQL
+      results.map { |attributes| options.class_name.constantize.new(attributes)}
 
-      options.model_class.new(results.first)
     end
   end
 
