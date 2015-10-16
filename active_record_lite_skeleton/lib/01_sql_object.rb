@@ -16,7 +16,6 @@ class SQLObject
 
   def self.finalize!
     self.columns.each do |column|
-      symbol_column = "@#{column}"
       set_column = "#{column}="
 
       define_method(column) { attributes[column] }
@@ -36,11 +35,17 @@ class SQLObject
   end
 
   def self.all
-    # ...
+    hash_objects = DBConnection.execute(<<-SQL)
+      SELECT
+        #{table_name}.*
+      FROM
+        #{table_name}
+    SQL
+    parse_all(hash_objects)
   end
 
   def self.parse_all(results)
-    # ...
+    results.map { |attributes| self.new(attributes) }
   end
 
   def self.find(id)
@@ -48,7 +53,14 @@ class SQLObject
   end
 
   def initialize(params = {})
-    # ...
+    params.each do |attribute, value|
+      unless self.class.columns.include?(attribute.to_sym)
+        raise "unknown attribute '#{attribute}'"
+      end
+      self.attributes[attribute] = value
+    end
+
+
   end
 
   def attributes
