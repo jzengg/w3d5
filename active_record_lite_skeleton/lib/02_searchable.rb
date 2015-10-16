@@ -13,10 +13,8 @@ module Searchable
       WHERE
         #{where_line}
       SQL
-      
-       results.map do |result|
-         self.new(Hash[result.map{ |k, v| [k.to_sym, v] }])
-       end
+
+      parse_all(results)
   end
 
 end

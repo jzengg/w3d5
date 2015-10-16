@@ -1,5 +1,6 @@
 require_relative 'db_connection'
 require 'active_support/inflector'
+require 'byebug'
 # NB: the attr_accessor we wrote in phase 0 is NOT used in the rest
 # of this project. It was only a warm up.
 
@@ -56,9 +57,10 @@ class SQLObject
       WHERE
         #{table_name}.id = ?
     SQL
-    return nil if results.empty?
-    symbols = Hash[results.first.map{ |k, v| [k.to_sym, v] }]
-    self.new(symbols)
+
+    parse_all(results).first #need to pass parse_all an array.
+      #if you pass it results.first since there's only 1 result, it will try to map the hash
+      # instead of mapping an array. so you'll end up with a messed up result
 
 
   end
@@ -68,7 +70,7 @@ class SQLObject
       unless self.class.columns.include?(attribute.to_sym)
         raise "unknown attribute '#{attribute}'"
       end
-      self.attributes[attribute] = value #try to dry out these methods dealing with converting keys to symbols
+      self.attributes[attribute.to_sym] = value #try to dry out these methods dealing with converting keys to symbols
     end
 
 
