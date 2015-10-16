@@ -20,10 +20,11 @@ end
 
 class BelongsToOptions < AssocOptions
   def initialize(name, options = {})
+    # defaults fails when passed a symbol
     defaults = {
-      foreign_key: "#{name.underscore}_id".to_sym,
+      foreign_key: "#{name.to_s.underscore}_id".to_sym,
       primary_key: :id,
-      class_name: "#{name.camelize}"
+      class_name: "#{name.to_s.camelize}"
     }
     attributes = defaults.merge(options)
 
@@ -39,9 +40,9 @@ end
 class HasManyOptions < AssocOptions
   def initialize(name, self_class_name, options = {})
     defaults = {
-      foreign_key: "#{self_class_name.underscore}_id".to_sym,
+      foreign_key: "#{self_class_name.to_s.underscore}_id".to_sym,
       primary_key: :id,
-      class_name: "#{name.camelize.singularize}"
+      class_name: "#{name.to_s.camelize.singularize}"
     }
 
     attributes = defaults.merge(options)
@@ -58,11 +59,62 @@ end
 module Associatable
   # Phase IIIb
   def belongs_to(name, options = {})
-    # ...
+
+    options = BelongsToOptions.new(name, options)
+
+    define_method(name) do
+      return nil if self.send(options.foreign_key).nil?
+
+      results = DBConnection.execute(<<-SQL)
+      SELECT
+        *
+      FROM
+        #{options.table_name}
+      WHERE
+        #{options.table_name}.#{options.primary_key} = #{self.send(options.foreign_key)}
+      SQL
+
+      options.model_class.new(results.first)
+    end
+
+    # class User < AR:BASE
+    #   belongs_to :country, class_name: "Country"
+    #   opts #=> class_name: Country, foreign_key: :country_id, primary_key: :id
+    #   u = User.new(country_id: 1)
+    #   u.country
+    #   SELECT
+    #     *
+    #   FROM
+    #     countries
+    #     #{opts.class.table_name}
+    #   WHERE
+    #     id = 1
+    #     id = country_id
+    #     #{opts.primary_key} = #{self.send(opts.foreign_key)}
+    #     self.country_id #-> 1
+    #     opts.foreign_key
+
   end
 
   def has_many(name, options = {})
-    # ...
+    options = HasManyOptions.new(name, options)
+
+    define_method(name) do
+      # return nil if self.send(options.foreign_key).nil?
+      puts options.table_name
+      puts options.class_name
+      puts name
+      results = DBConnection.execute(<<-SQL)
+      SELECT
+        *
+      FROM
+        #{options.table_name}
+      WHERE
+        #{options.table_name}.#{options.primary_key} = #{self.send(options.foreign_key)}
+      SQL
+
+      options.model_class.new(results.first)
+    end
   end
 
   def assoc_options
@@ -71,5 +123,5 @@ module Associatable
 end
 
 class SQLObject
-    # Mixin Associatable here...
+  extend Associatable
 end
