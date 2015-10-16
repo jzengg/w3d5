@@ -19,9 +19,8 @@ class SQLObject
       set_column = "#{column}="
 
       define_method(column) { attributes[column] }
-      define_method(set_column) do |value|
-        attributes[column] = value
-      end
+      define_method(set_column) { |value| attributes[column] = value }
+
     end
 
   end
@@ -49,7 +48,19 @@ class SQLObject
   end
 
   def self.find(id)
-    # ...
+    results = DBConnection.execute(<<-SQL, id)
+      SELECT
+        #{table_name}.*
+      FROM
+        #{table_name}
+      WHERE
+        #{table_name}.id = ?
+    SQL
+    return nil if results.empty?
+    symbols = results.first.inject({}){|memo,(k,v)| memo[k.to_sym] = v; memo}
+    self.new(symbols)
+
+
   end
 
   def initialize(params = {})
@@ -82,4 +93,5 @@ class SQLObject
   def save
     # ...
   end
+
 end
