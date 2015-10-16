@@ -57,7 +57,7 @@ class SQLObject
         #{table_name}.id = ?
     SQL
     return nil if results.empty?
-    symbols = results.first.inject({}){|memo,(k,v)| memo[k.to_sym] = v; memo}
+    symbols = Hash[results.first.map{ |k, v| [k.to_sym, v] }]
     self.new(symbols)
 
 
@@ -79,11 +79,19 @@ class SQLObject
   end
 
   def attribute_values
-    attributes.values
+    self.class.columns.map { |column| self.send(column) }
   end
 
   def insert
-    # ...
+    col_names = self.class.columns.map(&:to_s)
+    question_marks = ["?"] * col_names.length
+    DBConnection.execute(<<-SQL, attribute_values)
+      INSERT INTO
+        #{self.class.table_name} (#{col_names.join(", ")})
+      VALUES
+        (#{question_marks.join(", ")})
+    SQL
+    self.id = DBConnection.last_insert_row_id
   end
 
   def update
