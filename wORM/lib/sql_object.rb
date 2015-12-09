@@ -61,7 +61,7 @@ class SQLObject
       unless self.class.columns.include?(attribute.to_sym)
         raise "unknown attribute '#{attribute}'"
       end
-      self.attributes[attribute.to_sym] = value #try to dry out these methods dealing with converting keys to symbols
+      self.attributes[attribute.to_sym] = value
     end
 
 
