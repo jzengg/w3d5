@@ -1,105 +1,87 @@
-require_relative 'searchable'
-require 'active_support/inflector'
-require 'byebug'
-# Phase IIIa
-class AssocOptions
-  attr_accessor(
-    :foreign_key,
-    :class_name,
-    :primary_key
-  )
-
-  def model_class
-    self.class_name.constantize
-  end
-
-  def table_name
-    model_class.table_name
-  end
-end
-
-class BelongsToOptions < AssocOptions
-  def initialize(name, options = {})
-    # defaults fails when passed a symbol
-    defaults = {
-      foreign_key: "#{name.to_s.underscore}_id".to_sym,
-      primary_key: :id,
-      class_name: "#{name.to_s.camelize}"
-    }
-    attributes = defaults.merge(options)
-
-    attributes.each do |key, value|
-      sendable = "#{key}=".to_sym
-      self.send(sendable, value)
-    end
-
-
-  end
-end
-
-class HasManyOptions < AssocOptions
-  def initialize(name, self_class_name, options = {})
-    defaults = {
-      foreign_key: "#{self_class_name.to_s.underscore}_id".to_sym,
-      primary_key: :id,
-      class_name: "#{name.to_s.camelize.singularize}"
-    }
-    # byebug
-    attributes = defaults.merge(options)
-
-    attributes.each do |key, value|
-      sendable = "#{key}=".to_sym
-      self.send(sendable, value)
-    end
-
-  end
-
-end
-
 module Associatable
-  # Phase IIIb
-  def belongs_to(name, options = {})
 
-    options = BelongsToOptions.new(name, options)
+  def assoc_options
+    @assoc_options ||= {}
+  end
+
+  def belongs_to(name, options = {})
+    self.assoc_options[name] = BelongsToOptions.new(name, options)
 
     define_method(name) do
-      return nil if self.send(options.foreign_key).nil?
+      options = self.class.assoc_options[name]
+      key_value = self.send(options.foreign_key)
 
-      results = DBConnection.execute(<<-SQL)
-      SELECT
-        *
-      FROM
-        #{options.table_name}
-      WHERE
-        #{options.table_name}.#{options.primary_key} = #{self.send(options.foreign_key)}
-      SQL
-
-      options.model_class.new(results.first)
+      options.model_class.where(options.primary_key => key_value).first
     end
   end
 
   def has_many(name, options = {})
-    options = HasManyOptions.new(name, self, options)
+    self.assoc_options[name] = HasManyOptions.new(name, options)
     define_method(name) do
+      options = self.class_assoc_options[name]
+      key_value = self.send(options.primary_key)
 
-      results = DBConnection.execute(<<-SQL)
-      SELECT
-        *
-      FROM
-        #{options.table_name}
-      WHERE
-        #{options.table_name}.#{options.foreign_key} = #{self.send(options.primary_key)}
-      SQL
-      results.map { |attributes| options.class_name.constantize.new(attributes)}
-
+      options.model_class.where(options.foreign_key => key_value)
     end
   end
 
-  def assoc_options
+  def has_one_through(name, through_name, source_name)
+    define_method(name) do
+      through_options = self.class.assoc_options[through_name]
+      source_options = through_options.model_class.assoc_options[source_name]
 
+      key_value = self.send(through_foreign)
+      results = DBConnection.execute(<<-SQL, key_value)
+        SELECT
+          #{source_options.table_name}.*
+        FROM
+          #{through_options.table_name}
+        JOIN
+          #{source_options.table_name}
+        ON
+          #{through_options.table_name}.#{source_options.foreign_key} = #{source_options.table_name}.#{source_options.primary_key}
+        WHERE
+          #{through_options.table_name}.#{through_options.primary_key} = ?
+      SQL
+    end
   end
-end
 
-class SQLObject
-  extend Associatable
+  def has_many_through(name, through_name, source_name)
+    define_method(name) do
+      through_options = self.class.assoc_options[through_name]
+      source_options = through_options.model_class.assoc_options[source_name]
+
+      through_table = through_options.table_name
+      through_primary = through_options.primary_key
+      through_foreign = through_options.foreign_key
+
+      source_table = source_options.table_name
+      source_primary = source_options.primary_key
+      source_foreign = source_options.foreign_key
+
+      table_name = self.class.table_name
+
+      results = DBConnection.execute(<<-SQL, self.id)
+        SELECT
+          #{source_table}.*
+        FROM
+          #{source_table}
+        JOIN
+          #{through_table}
+        ON
+          #{source_table}.#{source_primary} = #{through_table}.#{source_foreign}
+        JOIN
+          #{table_name}
+        ON
+          #{table_name}.id = #{through_table}.#{through_foreign}
+        WHERE
+          #{table_name}.id = ?
+        ORDER BY
+          #{source_table}.#{source_primary}
+      SQL
+
+      source_options.model_class.parse_all(results)
+    end
+  end
+  
 end
