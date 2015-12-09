@@ -1,8 +1,6 @@
 require_relative 'db_connection'
 require 'active_support/inflector'
 require 'byebug'
-# NB: the attr_accessor we wrote in phase 0 is NOT used in the rest
-# of this project. It was only a warm up.
 
 class SQLObject
   def self.columns
@@ -21,7 +19,6 @@ class SQLObject
 
       define_method(column) { attributes[column] }
       define_method(set_column) { |value| attributes[column] = value }
-
     end
 
   end
@@ -57,12 +54,7 @@ class SQLObject
       WHERE
         #{table_name}.id = ?
     SQL
-
-    parse_all(results).first #need to pass parse_all an array.
-      #if you pass it results.first since there's only 1 result, it will try to map the hash
-      # instead of mapping an array. so you'll end up with a messed up result
-
-
+    parse_all(results).first
   end
 
   def initialize(params = {})

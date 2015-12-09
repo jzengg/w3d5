@@ -1,4 +1,4 @@
-require_relative '02_searchable'
+require_relative 'searchable'
 require 'active_support/inflector'
 require 'byebug'
 # Phase IIIa
@@ -76,31 +76,11 @@ module Associatable
 
       options.model_class.new(results.first)
     end
-
-    # class User < AR:BASE
-    #   belongs_to :country, class_name: "Country"
-    #   opts #=> class_name: Country, foreign_key: :country_id, primary_key: :id
-    #   u = User.new(country_id: 1)
-    #   u.country
-    #   SELECT
-    #     *
-    #   FROM
-    #     countries
-    #     #{opts.class.table_name}
-    #   WHERE
-    #     id = 1
-    #     id = country_id
-    #     #{opts.primary_key} = #{self.send(opts.foreign_key)}
-    #     self.country_id #-> 1
-    #     opts.foreign_key
-
   end
 
   def has_many(name, options = {})
     options = HasManyOptions.new(name, self, options)
     define_method(name) do
-      # byebug
-      # return nil if self.send(options.foreign_key).nil?
 
       results = DBConnection.execute(<<-SQL)
       SELECT
@@ -116,7 +96,7 @@ module Associatable
   end
 
   def assoc_options
-    # Wait to implement this in Phase IVa. Modify `belongs_to`, too.
+
   end
 end
 
